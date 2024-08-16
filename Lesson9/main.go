@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"time"
 )
 
 func main() {
@@ -117,6 +118,137 @@ func main() {
 		fmt.Println(k, v)
 	}
 
+	// channel
+	// 送受信どちらも
+	var ch1 chan int
+	// 受信専用
+	// var ch2 <-chan int
+	// // 送信専用
+	// var ch3 chan<- int
+
+	ch1 = make(chan int)
+	ch2 := make(chan int)
+
+	fmt.Println(cap(ch1))
+	fmt.Println(cap(ch2))
+
+	ch3 := make(chan int, 5)
+	fmt.Println(cap(ch3))
+
+	ch3 <- 1
+	fmt.Println("len", len(ch3))
+
+	ch3 <- 2
+	ch3 <- 3
+	fmt.Println(len(ch3))
+
+	i := <- ch3
+	fmt.Println(i)
+	fmt.Println("len", len(ch3))
+	i2 := <- ch3
+	fmt.Println(i2)
+	fmt.Println("len", len(ch3))
+	fmt.Println(<-ch3)
+	fmt.Println("len", len(ch3))
+
+	ch3 <- 1
+	ch3 <- 2
+	ch3 <- 3
+	ch3 <- 4
+	ch3 <- 5
+	// ch3 <- 6	// チャネルのサイズオーバでデッドロック
+
+	ch4 := make(chan int)
+	ch5 := make(chan int)
+	// fmt.Println(<-ch4)	// エラー
+	
+	go receiver(ch4)
+	go receiver(ch5)
+
+	i3 := 0
+	for i3 < 10{
+		ch4 <- i3
+		ch5 <- i3
+		time.Sleep(50*time.Millisecond)
+		i3++
+	}
+
+	ch1_close := make(chan int, 2)
+	// close(ch1_close)
+	// // ch1_close <- 1	//エラー
+	// // fmt.Println(<-ch1_close)	// 受信はできる
+
+	// i4, ok := <-ch1_close
+	// fmt.Println(i4, ok)
+
+	go receiver_close("1.gorutin", ch1_close)
+	go receiver_close("2.gorutin", ch1_close)
+	go receiver_close("3.gorutin", ch1_close)
+	
+	i5 := 0
+	for i5 < 10{
+		ch1_close <- i5
+		i5++
+	}
+	close(ch1_close)
+	time.Sleep(3*time.Second)
+
+
+	ch1_for := make(chan int, 3)
+	ch1_for <- 1
+	ch1_for <- 2
+	ch1_for <- 3
+	close(ch1_for)		// これを入れないとエラー
+	for j := range ch1_for{
+		fmt.Println(j)
+	}
+
+	ch1_select := make(chan int, 2)
+	ch2_select := make(chan string, 2)
+
+	// ch1_select <- 1
+	// ch2_select <- "A"
+
+	select{
+		case v1 := <-ch1_select:
+			fmt.Println(v1 + 1000)
+		case v2 := <-ch2_select:
+			fmt.Println(v2 + "!?")
+		default:
+			fmt.Println("どちらでもない")
+	}
+
+	ch3_select := make(chan int)
+	ch4_select := make(chan int)
+	ch5_select := make(chan int)
+
+	go func ()  {
+		for {
+			i_se := <- ch3_select
+			ch4_select <- i_se * 2
+		}
+	}()
+
+	go func ()  {
+		for {
+			i2_se := <- ch4_select
+			ch5_select <- i2_se - 1
+		}
+	}()
+
+	n2 := 0
+	for {
+		select {
+			case ch3_select <- n2:
+				n2++
+			case i3_se := <-ch5_select:
+				fmt.Println("received", i3_se)
+		}
+		if n2 > 100{
+			break
+		}
+	}
+
 }
 
 
@@ -126,4 +258,23 @@ func Sum(s ...int) int{
 		n += v
 	}
 	return n
+}
+
+func receiver(c chan int){
+	for{
+		i := <-c
+		fmt.Println(i)
+	}
+}
+
+func receiver_close(name string, ch chan int){
+	for{
+		i, ok := <-ch
+		if !ok{
+			break
+		}else{
+			fmt.Println(i, name)
+		}
+	}
+	fmt.Println(name + "END")
 }
